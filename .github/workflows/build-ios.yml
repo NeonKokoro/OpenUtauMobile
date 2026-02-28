@@ -1,0 +1,38 @@
+name: Build OpenUtau iOS
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive' # OpenUtau likely uses submodules
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x # Check the README for the exact version needed
+
+      - name: Install MAUI/iOS Workload
+        run: dotnet workload install ios
+
+      - name: Restore Dependencies
+        run: dotnet restore OpenUtauMobile.sln
+
+      - name: Build Unsigned IPA
+        run: |
+          dotnet publish OpenUtauMobile.csproj \
+            -f net8.0-ios \
+            -c Release \
+            -p:ArchiveOnBuild=true \
+            -p:CodesignKey="" \
+            -p:CodesignProvision="" \
+            -p:BuildIpa=true
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenUtau-iOS-Unsigned
+          path: bin/Release/net8.0-ios/publish/*.ipa
