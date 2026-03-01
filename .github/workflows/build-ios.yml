@@ -15,8 +15,10 @@ jobs:
         with:
           dotnet-version: 8.x # Check the README for the exact version needed
 
-      - name: Install MAUI/iOS Workload
-        run: dotnet workload install ios
+      - name: Install All MAUI Workloads
+        # Installing the full 'maui' workload covers iOS, Android, and MacCatalyst, 
+        # preventing errors during the project restore phase.
+        run: dotnet workload install maui
 
       - name: Restore Dependencies
         run: dotnet restore OpenUtauMobile.sln
