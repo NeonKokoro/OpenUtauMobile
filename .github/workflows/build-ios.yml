@@ -8,24 +8,24 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive' # OpenUtau likely uses submodules
+          submodules: 'recursive'
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x # Check the README for the exact version needed
+          dotnet-version: 8.x
 
       - name: Install All MAUI Workloads
-        # Installing the full 'maui' workload covers iOS, Android, and MacCatalyst, 
-        # preventing errors during the project restore phase.
         run: dotnet workload install maui
 
       - name: Restore Dependencies
+        # The solution file is in the root, so this is usually fine.
         run: dotnet restore OpenUtauMobile.sln
 
       - name: Build Unsigned IPA
+        # Updated the path to point to the file inside the subfolder
         run: |
-          dotnet publish OpenUtauMobile.csproj \
+          dotnet publish OpenUtauMobile/OpenUtauMobile.csproj \
             -f net8.0-ios \
             -c Release \
             -p:ArchiveOnBuild=true \
@@ -37,4 +37,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: OpenUtau-iOS-Unsigned
-          path: bin/Release/net8.0-ios/publish/*.ipa
+          # Updated path to include the subfolder structure where .NET places the output
+          path: OpenUtauMobile/bin/Release/net8.0-ios/publish/*.ipa
