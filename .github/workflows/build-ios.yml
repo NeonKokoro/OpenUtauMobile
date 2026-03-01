@@ -13,7 +13,13 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x
+          dotnet-version: 9.x # Switched to 9.x based on your error logs
+
+      - name: Patch Duplicate Packages
+        # This fixes NU1504 by removing the specific line for version 1.16.0 
+        # so only 1.16.3 remains in the Core project.
+        run: |
+          sed -i '' '/Microsoft.ML.OnnxRuntime" Version="1.16.0"/d' OpenUtau.Core/OpenUtau.Core.csproj
 
       - name: Install All MAUI Workloads
         run: dotnet workload install maui
@@ -22,26 +28,22 @@ jobs:
         run: dotnet restore OpenUtauMobile.sln
 
       - name: Build Unsigned IPA
-        # Added -p:TargetPlatformIdentifier=ios and -r ios-arm64 to fix the "zero length" error
-        # These flags force the compiler to recognize the target as an iOS device
+        # Removed the manual TargetPlatformVersion and TargetPlatformIdentifier 
+        # to stop the "Duplicate frameworks found" error. 
+        # We are letting the project file handle the identity now.
         run: |
           dotnet publish OpenUtauMobile/OpenUtauMobile.csproj \
-            -f net8.0-ios \
+            -f net9.0-ios \
             -c Release \
             -r ios-arm64 \
             -p:ArchiveOnBuild=true \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
             -p:BuildIpa=true \
-            -p:CheckEolTargetFramework=false \
-            -p:TargetPlatformVersion=18.0 \
-            -p:TargetPlatformIdentifier=ios \
             -p:MtouchLink=SdkOnly
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: OpenUtau-iOS-Unsigned
-          # The path might shift slightly when using a Runtime Identifier (-r), 
-          # so we use a wildcard to ensure it finds the IPA.
-          path: OpenUtauMobile/bin/Release/net8.0-ios/ios-arm64/publish/*.ipa
+          path: OpenUtauMobile/bin/Release/net9.0-ios/ios-arm64/publish/*.ipa
