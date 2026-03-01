@@ -19,11 +19,10 @@ jobs:
         run: dotnet workload install maui
 
       - name: Restore Dependencies
-        # The solution file is in the root, so this is usually fine.
         run: dotnet restore OpenUtauMobile.sln
 
       - name: Build Unsigned IPA
-        # Updated the path to point to the file inside the subfolder
+        # Added flags to bypass EOL (End of Life) checks and fix the TargetPlatformVersion 1.0 error
         run: |
           dotnet publish OpenUtauMobile/OpenUtauMobile.csproj \
             -f net8.0-ios \
@@ -31,11 +30,12 @@ jobs:
             -p:ArchiveOnBuild=true \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
-            -p:BuildIpa=true
+            -p:BuildIpa=true \
+            -p:CheckEolTargetFramework=false \
+            -p:TargetPlatformVersion=18.0
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: OpenUtau-iOS-Unsigned
-          # Updated path to include the subfolder structure where .NET places the output
           path: OpenUtauMobile/bin/Release/net8.0-ios/publish/*.ipa
