@@ -1,0 +1,104 @@
+name: Build OpenUtau Mobile (iOS)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
+jobs:
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest  # REQUIRED: Apple toolchain only runs on macOS
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better caching heuristics
+
+      # ── 2. macOS environment info (helpful for debugging failures) ─────────
+      - name: Print macOS & Xcode versions
+        run: |
+          sw_vers
+          xcode-select --print-path
+          xcodebuild -version
+
+      # ── 3. Select a stable Xcode version (15+, as required) ───────────────
+      - name: Select Xcode 15
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15'  # Minimum required per build guide
+
+      # ── 4. Set up .NET 9 SDK ───────────────────────────────────────────────
+      - name: Set up .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # ── 5. Verify dotnet installation ─────────────────────────────────────
+      - name: Verify .NET version
+        run: dotnet --version
+
+      # ── 6. Install MAUI iOS workload ───────────────────────────────────────
+      #    Using maui-ios (not full maui) to avoid pulling Android toolchain,
+      #    which significantly speeds up CI and reduces failure surface.
+      - name: Install MAUI iOS workload
+        run: |
+          dotnet workload install maui-ios --skip-sign-check
+          dotnet workload list  # Print installed workloads for debugging
+
+      # ── 7. Cache NuGet packages ────────────────────────────────────────────
+      #    Caching the global NuGet cache saves ~1-3 min on repeat runs.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/*.sln') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # ── 8. Restore dependencies (iOS target only) ─────────────────────────
+      #    Scoping to net9.0-ios prevents accidental Android workload pulls.
+      - name: Restore NuGet dependencies
+        run: dotnet restore -p:TargetFramework=net9.0-ios
+
+      # ── 9. Build & publish IPA ─────────────────────────────────────────────
+      #    ArchiveOnBuild=true produces an .ipa in the publish folder.
+      #    Using Debug config (faster ~2-5 min vs Release AOT ~20-40 min).
+      #    Codesign is disabled since we have no provisioning profile in CI.
+      - name: Build iOS IPA (Debug, no codesign)
+        run: |
+          dotnet publish OpenUtauMobile/OpenUtauMobile.csproj \
+            -f net9.0-ios \
+            -c Debug \
+            -p:ArchiveOnBuild=true \
+            -p:RuntimeIdentifier=ios-arm64 \
+            -p:TargetFrameworks=net9.0-ios \
+            -p:CodesignKey="" \
+            -p:CodesignProvision="" \
+            -p:EnableCodeSigning=false
+
+      # ── 10. Verify the IPA was produced ───────────────────────────────────
+      - name: Verify IPA exists
+        run: |
+          IPA_PATH="OpenUtauMobile/bin/Debug/net9.0-ios/ios-arm64/publish/OpenUtauMobile.ipa"
+          if [ -f "$IPA_PATH" ]; then
+            echo "✅ IPA found: $IPA_PATH"
+            ls -lh "$IPA_PATH"
+          else
+            echo "❌ IPA not found at expected path. Listing publish dir:"
+            find OpenUtauMobile/bin -name "*.ipa" || echo "No .ipa files found anywhere."
+            exit 1
+          fi
+
+      # ── 11. Upload IPA as build artifact ──────────────────────────────────
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenUtauMobile-iOS-Debug
+          path: OpenUtauMobile/bin/Debug/net9.0-ios/ios-arm64/publish/OpenUtauMobile.ipa
+          retention-days: 7  # Keep for 7 days (free account limit)
+          if-no-files-found: error  # Fail loudly if IPA is missing
