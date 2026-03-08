@@ -30,7 +30,7 @@ jobs:
       - name: Select Xcode 15
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15'  # Minimum required per build guide
+          xcode-version: '16.4.0'  # Minimum required per build guide
 
       # ── 4. Set up .NET 9 SDK ───────────────────────────────────────────────
       - name: Set up .NET 9 SDK
